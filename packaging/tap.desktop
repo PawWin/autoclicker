@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Tap
+Comment=A small desktop autoclicker
+Exec=tap-autoclicker
+Icon=tap
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=autoclicker;mouse;automation;

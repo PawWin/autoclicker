@@ -1,0 +1,183 @@
+import { SpinBox } from "std-widgets.slint";
+
+component Choice inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    in property <bool> enabled: true;
+    callback chosen;
+    height: 36px;
+    border-radius: 6px;
+    background: selected ? #252522 : touch.has-hover && enabled ? #e9e7e1 : transparent;
+    opacity: enabled ? 1 : 0.45;
+    border-width: keyboard.has-focus ? 2px : 0px;
+    border-color: #ee6440;
+    forward-focus: keyboard;
+    Text { text: label; color: selected ? #ffffff : #65655e; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { keyboard.focus(); root.chosen(); } }
+    keyboard := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == " " || event.text == "\n" { root.chosen(); return accept; }
+            return reject;
+        }
+    }
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { if enabled { root.chosen(); } }
+}
+
+export component AppWindow inherits Window {
+    title: "Tap · Autoclicker";
+    icon: @image-url("../assets/icon.svg");
+    min-width: 420px;
+    max-width: 420px;
+    min-height: 650px;
+    max-height: 650px;
+    background: #f7f6f2;
+    default-font-family: "DejaVu Sans";
+    default-font-size: 13px;
+    in-out property <string> interval-text: "100";
+    in-out property <int> mouse-button: 0;
+    in-out property <bool> limited: false;
+    in-out property <int> limit: 100;
+    in property <bool> running: false;
+    in property <int> countdown: 0;
+    in property <string> clicks: "0";
+    in property <string> status: "Ready when you are";
+    in property <string> notice;
+    in property <bool> hotkey-available: false;
+    callback toggle;
+    forward-focus: focus;
+
+    focus := FocusScope {
+    VerticalLayout {
+        padding: 28px;
+        spacing: 0px;
+        HorizontalLayout {
+            height: 42px;
+            spacing: 12px;
+            Rectangle {
+                width: 38px; height: 38px; background: #f16643; border-radius: 10px;
+                Path {
+                    x: 11px; y: 9px; width: 18px; height: 22px;
+                    fill: #ffffff;
+                    commands: "M 1 1 L 1 19 L 6 14 L 10 22 L 14 20 L 10 12 L 18 12 Z";
+                }
+            }
+            VerticalLayout {
+                spacing: 0px;
+                Text { text: "tap"; color: #252522; font-size: 25px; font-weight: 700; }
+                Text { text: "A little less clicking."; color: #77776f; font-size: 11px; }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "AUTOCLICKER"; color: #8c8c83; font-size: 9px; letter-spacing: 1.3px; vertical-alignment: center; }
+        }
+        Rectangle { height: 30px; }
+        HorizontalLayout {
+            height: 20px;
+            Text { text: "CLICK INTERVAL"; color: #77776f; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "10–60,000 ms"; color: #8c8c83; font-size: 10px; }
+        }
+        Rectangle { height: 10px; }
+        Rectangle {
+            height: 94px; background: #ffffff; border-color: interval-input.has-focus ? #ee6440 : #deded5; border-width: 1px; border-radius: 10px;
+            HorizontalLayout {
+                padding-left: 18px; padding-right: 18px; spacing: 8px;
+                Text { text: "Every"; color: #77776f; font-size: 15px; vertical-alignment: center; }
+                interval-input := TextInput {
+                    text <=> root.interval-text; enabled: !root.running; font-size: 36px;
+                    color: #252522; horizontal-alignment: right; vertical-alignment: center;
+                    input-type: number; single-line: true; horizontal-stretch: 1;
+                    accessible-label: "Click interval in milliseconds";
+                }
+                Text { text: "ms"; color: #77776f; font-size: 16px; vertical-alignment: center; }
+            }
+        }
+        Rectangle { height: 10px; }
+        HorizontalLayout {
+            height: 30px; spacing: 7px;
+            for value in [50, 100, 500, 1000] : Choice {
+                height: 30px;
+                label: value == 1000 ? "1 sec" : value + " ms";
+                selected: root.interval-text == value;
+                enabled: !root.running;
+                chosen => { root.interval-text = value; }
+            }
+        }
+        Rectangle { height: 25px; }
+        Text { height: 18px; text: "MOUSE BUTTON"; color: #77776f; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+        Rectangle { height: 8px; }
+        Rectangle {
+            height: 44px; background: #eeede7; border-radius: 8px;
+            HorizontalLayout { padding: 4px; spacing: 3px;
+                for label[index] in ["Left", "Right", "Middle"] : Choice {
+                    label: label; selected: root.mouse-button == index; enabled: !root.running;
+                    chosen => { root.mouse-button = index; }
+                }
+            }
+        }
+        Rectangle { height: 23px; }
+        HorizontalLayout {
+            height: 20px;
+            Text { text: "REPEAT"; color: #77776f; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+            Rectangle { horizontal-stretch: 1; }
+            if root.limited : Text { text: "clicks"; color: #8c8c83; font-size: 11px; }
+        }
+        Rectangle { height: 8px; }
+        HorizontalLayout {
+            height: 44px; spacing: 10px;
+            Rectangle {
+                background: #eeede7; border-radius: 8px;
+                HorizontalLayout { padding: 4px; spacing: 3px;
+                    Choice { label: "Until stopped"; selected: !root.limited; enabled: !root.running; chosen => { root.limited = false; } }
+                    Choice { label: "Count"; selected: root.limited; enabled: !root.running; chosen => { root.limited = true; } }
+                }
+            }
+            if root.limited : SpinBox { width: 104px; minimum: 1; maximum: 1000000; value <=> root.limit; enabled: !root.running; accessible-label: "Number of clicks"; }
+        }
+        Rectangle { vertical-stretch: 1; min-height: 12px; }
+        Text {
+            height: 38px; text: root.notice != "" ? root.notice : "Clicks follow your cursor. Start with a 3-second countdown.";
+            wrap: word-wrap; color: root.notice != "" ? #a4482d : #83837a; font-size: 11px; vertical-alignment: center;
+        }
+        Rectangle { height: 10px; }
+        Rectangle {
+            height: 52px; border-radius: 9px;
+            background: root.running ? (start-touch.has-hover ? #33332d : #252522) : (start-touch.has-hover ? #df5634 : #ee6440);
+            animate background { duration: 120ms; }
+            HorizontalLayout {
+                padding-left: 18px; padding-right: 18px;
+                Text { text: root.running ? (root.countdown > 0 ? "Cancel · " + root.countdown : "Stop clicking") : "Start clicking"; color: white; font-size: 14px; font-weight: 600; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                if root.hotkey-available : Text { text: "F6"; color: #ffffff; opacity: 0.75; vertical-alignment: center; font-size: 11px; }
+            }
+            border-width: start-keyboard.has-focus ? 2px : 0px;
+            border-color: #a53b20;
+            forward-focus: start-keyboard;
+            start-touch := TouchArea { mouse-cursor: pointer; clicked => { start-keyboard.focus(); root.toggle(); } }
+            start-keyboard := FocusScope {
+                key-pressed(event) => {
+                    if event.text == " " || event.text == "\n" { root.toggle(); return accept; }
+                    return reject;
+                }
+            }
+            accessible-role: button;
+            accessible-label: root.running ? "Stop clicking" : "Start clicking";
+            accessible-action-default => { root.toggle(); }
+        }
+        Rectangle { height: 16px; }
+        HorizontalLayout {
+            height: 18px; spacing: 7px;
+            Rectangle { width: 6px; height: 6px; border-radius: 3px; background: root.running ? #ee6440 : #a3a398; y: 6px; }
+            Text { text: root.status; color: #77776f; font-size: 10px; vertical-alignment: center; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: root.clicks + " clicks"; color: #77776f; font-size: 10px; vertical-alignment: center; }
+        }
+    }
+        key-pressed(event) => {
+            if event.text == Key.Escape && root.running { root.toggle(); return accept; }
+            return reject;
+        }
+    }
+}
