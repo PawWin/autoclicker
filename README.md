@@ -38,7 +38,7 @@ Clicks follow the current cursor position. The counter resets for each session. 
 - **Linux / X11:** input through the Rust X11 backend; global F6 shortcut.
 - **Linux / Wayland:** experimental input through Enigo's Wayland backend, requiring compositor support for virtual pointer protocols. Global F6 is disabled because X11 hotkeys cannot control native Wayland applications. Use the in-app Stop button. On unsupported compositors input can fail or be limited to XWayland applications; use an X11 session for full support.
 
-The app reports shortcut availability, invalid settings, and input errors in the window. Release builds are compiled and tested on Windows and Linux in GitHub Actions. macOS builds are not included. Interactive Windows behavior has not been verified in this Linux workspace.
+The app reports shortcut availability, invalid settings, and input errors in the window. Release 0.0.1 was built locally: Linux on an isolated Ubuntu 22.04 userspace, and Windows through cargo-xwin targeting MSVC. Both packages were checked for startup on Linux (the Windows executable under Wine). Native Windows interaction has not been verified. macOS builds are not included.
 
 ## Development
 
@@ -54,6 +54,26 @@ Built with [Slint](https://slint.dev/) and [Enigo](https://github.com/enigo-rs/e
 
 ## Release builds
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds a Windows x64 portable executable with an embedded icon and no console window, and a Linux x64 AppImage on Ubuntu 22.04. Both jobs run formatting, Clippy, and engine tests. Once both succeed, the workflow publishes the binaries and SHA-256 checksums to the tagged GitHub release. The version in `Cargo.toml` must match the tag, and release notes must exist in `releases/<version>.md`.
+An optional GitHub Actions workflow is included at `.github/workflows/release.yml`; pushing a `v*` tag triggers it when Actions is available. It builds a Windows x64 portable executable with an embedded icon and no console window, and a Linux x64 AppImage on Ubuntu 22.04. Both jobs run formatting, Clippy, and engine tests. Once both succeed, the workflow publishes the binaries and SHA-256 checksums to the tagged GitHub release. The version in `Cargo.toml` must match the tag, and release notes must exist in `releases/<version>.md`.
 
 The workflow can also be started manually to build artifacts without publishing a release.
+
+### Build releases locally
+
+On Ubuntu 22.04, install the development packages listed in the workflow, plus `file`, then run:
+
+```sh
+cargo build --release --locked
+bash packaging/appimage.sh
+```
+
+For a Windows executable from Linux, install Clang, LLD, LLVM tools, and [cargo-xwin](https://github.com/rust-cross/cargo-xwin), then run:
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo xwin build --release --locked --target x86_64-pc-windows-msvc
+mkdir -p dist
+cp target/x86_64-pc-windows-msvc/release/tap-autoclicker.exe dist/Tap-0.0.1-windows-x86_64.exe
+```
+
+The Windows build embeds the icon and statically links the C runtime. Published executables are unsigned. GitHub Actions is not required to build or upload a release.
