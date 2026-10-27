@@ -38,7 +38,7 @@ Clicks follow the current cursor position. The counter resets for each session. 
 - **Linux / X11:** input through the Rust X11 backend; global F6 shortcut.
 - **Linux / Wayland (niri and Hyprland):** native clicks through `wlr-virtual-pointer`, with automatic compositor shortcuts for global start/stop. Requires [niri 25.02 or newer](https://github.com/niri-wm/niri/releases/tag/v25.02), or Hyprland with the virtual pointer protocol enabled. Other compositors exposing the same protocol may also work. Unsupported compositors report an error instead of silently falling back to XWayland. No root access or input helper daemon is required.
 
-The app reports shortcut availability, invalid settings, and input errors in the window. Release 0.0.1 was built locally: Linux on an isolated Ubuntu 22.04 userspace, and Windows through cargo-xwin targeting MSVC. Both packages were checked for startup on Linux (the Windows executable under Wine). Native Windows interaction has not been verified. macOS builds are not included.
+The app reports shortcut availability, invalid settings, and input errors in the window. Release 0.0.2 was built locally: Linux on an isolated Ubuntu 22.04 userspace, and Windows through cargo-xwin targeting MSVC. Both packages were checked for startup on Linux (the Windows executable under Wine). Native Windows interaction has not been verified. macOS builds are not included.
 
 ## niri and Hyprland shortcuts
 
@@ -84,7 +84,7 @@ For a Windows executable from Linux, install Clang, LLD, LLVM tools, and [cargo-
 rustup target add x86_64-pc-windows-msvc
 cargo xwin build --release --locked --target x86_64-pc-windows-msvc
 mkdir -p dist
-cp target/x86_64-pc-windows-msvc/release/tap-autoclicker.exe dist/Tap-0.0.1-windows-x86_64.exe
+cp target/x86_64-pc-windows-msvc/release/tap-autoclicker.exe dist/Tap-0.0.2-windows-x86_64.exe
 ```
 
 The Windows build embeds the icon and statically links the C runtime. Published executables are unsigned. GitHub Actions is not required to build or upload a release.
