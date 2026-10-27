@@ -83,16 +83,16 @@ fn session(
 }
 
 pub fn worker(rx: mpsc::Receiver<Command>, tx: mpsc::Sender<Event>) {
-    use enigo::{Button, Direction, Enigo, Mouse, Settings};
+    use crate::input::Input;
     let mut pending = None;
     loop {
         let command = pending.take().or_else(|| rx.recv().ok());
         match command {
             Some(Command::Start(id, config)) => {
-                let mut input = match Enigo::new(&Settings::default()) {
+                let mut input = match Input::new() {
                     Ok(input) => input,
                     Err(error) => {
-                        let _ = tx.send(Event::Error(id, format!("Input unavailable: {error}")));
+                        let _ = tx.send(Event::Error(id, error));
                         continue;
                     }
                 };
@@ -101,14 +101,7 @@ pub fn worker(rx: mpsc::Receiver<Command>, tx: mpsc::Sender<Event>) {
                     config,
                     &rx,
                     &tx,
-                    |button| {
-                        input
-                            .button(
-                                [Button::Left, Button::Right, Button::Middle][button],
-                                Direction::Click,
-                            )
-                            .map_err(|error| format!("Click failed: {error}"))
-                    },
+                    |button| input.click(button),
                     Duration::from_secs(1),
                 )
                 .err();

@@ -1,6 +1,9 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+#[cfg(target_os = "linux")]
+mod control;
 mod engine;
+mod input;
 
 use engine::{Command, Config, Event};
 use global_hotkey::{
@@ -13,6 +16,37 @@ use std::{cell::Cell, rc::Rc, sync::mpsc, time::Duration};
 slint::include_modules!();
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if !args.is_empty() {
+        match args.as_slice() {
+            [flag] if flag == "--help" || flag == "-h" => {
+                println!(
+                    "Tap autoclicker\nUsage: tap-autoclicker [--toggle | --stop | --help]\n\nOn Linux/Wayland, --toggle and --stop control the running app."
+                );
+                return Ok(());
+            }
+            #[cfg(target_os = "linux")]
+            [flag] if flag == "--toggle" || flag == "--stop" => {
+                let action = if flag == "--toggle" {
+                    control::Action::Toggle
+                } else {
+                    control::Action::Stop
+                };
+                control::send(action).map_err(|error| {
+                    format!("Cannot control Tap. Open Tap in this Wayland session first: {error}")
+                })?;
+                return Ok(());
+            }
+            _ => return Err("Unknown arguments. Use --help for usage.".into()),
+        }
+    }
+    let wayland = input::is_wayland();
+    #[cfg(target_os = "linux")]
+    let control = if wayland {
+        Some(control::Control::bind()?)
+    } else {
+        None
+    };
     let ui = AppWindow::new()?;
     let (commands, command_rx) = mpsc::channel();
     let (events, event_rx) = mpsc::channel();
@@ -20,7 +54,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let generation = Rc::new(Cell::new(0u64));
 
     // X11 shortcuts do not work across native Wayland applications. Don't advertise them.
-    let wayland = cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some();
     let hotkey = HotKey::new(None, Code::F6);
     let manager = if wayland {
         None
@@ -31,7 +64,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     ui.set_hotkey_available(manager.is_some());
     let default_notice: slint::SharedString = if wayland {
-        "Wayland: global F6 is unavailable. Use Stop in this window. Input requires compositor support.".into()
+        "Wayland: bind F6 to tap-autoclicker --toggle in your compositor. Stop also works here."
+            .into()
     } else if manager.is_none() {
         "F6 is unavailable. Use the Start / Stop button in this window.".into()
     } else {
@@ -83,6 +117,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Duration::from_millis(30),
         move || {
             let Some(ui) = weak.upgrade() else { return };
+            #[cfg(target_os = "linux")]
+            if let Some(control) = &control {
+                // Process one command per tick; a stop never starts an idle session.
+                if let Some(action) = control.receive() {
+                    match action {
+                        control::Action::Toggle => ui.invoke_toggle(),
+                        control::Action::Stop if ui.get_running() => ui.invoke_toggle(),
+                        control::Action::Stop => {}
+                    }
+                }
+            }
             for event in GlobalHotKeyEvent::receiver().try_iter() {
                 if event.id == hotkey.id() && event.state == HotKeyState::Pressed {
                     ui.invoke_toggle();

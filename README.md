@@ -36,9 +36,33 @@ Clicks follow the current cursor position. The counter resets for each session. 
 - **Windows:** native input injection and global F6 shortcut.
 - **macOS:** input injection requires granting Accessibility permission to the app or launching terminal in System Settings. Global shortcuts may also require permission.
 - **Linux / X11:** input through the Rust X11 backend; global F6 shortcut.
-- **Linux / Wayland:** experimental input through Enigo's Wayland backend, requiring compositor support for virtual pointer protocols. Global F6 is disabled because X11 hotkeys cannot control native Wayland applications. Use the in-app Stop button. On unsupported compositors input can fail or be limited to XWayland applications; use an X11 session for full support.
+- **Linux / Wayland (niri and Hyprland):** native clicks through `wlr-virtual-pointer`, with compositor keybindings for global start/stop. Requires [niri 25.02 or newer](https://github.com/niri-wm/niri/releases/tag/v25.02), or Hyprland with the virtual pointer protocol enabled. Other compositors exposing the same protocol may also work. Unsupported compositors report an error instead of silently falling back to XWayland. No root access or input helper daemon is required.
 
 The app reports shortcut availability, invalid settings, and input errors in the window. Release 0.0.1 was built locally: Linux on an isolated Ubuntu 22.04 userspace, and Windows through cargo-xwin targeting MSVC. Both packages were checked for startup on Linux (the Windows executable under Wine). Native Windows interaction has not been verified. macOS builds are not included.
+
+## niri and Hyprland shortcuts
+
+Open Tap normally, then add compositor keybindings to control the running window from any app. `--toggle` starts a new countdown or stops the current session; `--stop` only stops, including during the countdown. These commands exit immediately and do not open another window. Tap must already be running in the same Wayland session.
+
+For **niri**, add these entries to the `binds` block in `~/.config/niri/config.kdl`:
+
+```kdl
+binds {
+    F6 repeat=false { spawn "tap-autoclicker" "--toggle"; }
+    F7 repeat=false allow-inhibiting=false { spawn "tap-autoclicker" "--stop"; }
+}
+```
+
+For **Hyprland**, add to `~/.config/hypr/hyprland.conf`:
+
+```ini
+bind = , F6, exec, tap-autoclicker --toggle
+bind = , F7, exec, tap-autoclicker --stop
+```
+
+Replace `tap-autoclicker` with the absolute path to your executable if it is not on `PATH`. For an AppImage, use its absolute path in both bindings, for example `/home/you/Applications/Tap-0.0.1-linux-x86_64.AppImage --toggle` (in niri, keep the path and argument as separate quoted strings). Reload your compositor configuration after editing it. Choose other keys if F6/F7 are already bound. The in-app Stop button and focused Escape key remain available.
+
+Tap does not register X11 global shortcuts on Wayland; the compositor owns these bindings. A single Tap window runs per Wayland display, using a control socket under `XDG_RUNTIME_DIR`. Running the command from a different session or without Tap open returns an error.
 
 ## Development
 
@@ -48,7 +72,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-`ui/app.slint` defines the interface. `src/main.rs` connects callbacks, global shortcuts, and UI updates. `src/engine.rs` owns the click worker and interruptible timing. Engine tests use an injected click function and never inject real mouse input.
+`ui/app.slint` defines the interface. `src/main.rs` connects callbacks, global shortcuts, and UI updates. `src/engine.rs` owns the click worker and interruptible timing. `src/input/wayland.rs` provides the native Wayland pointer backend, and `src/control.rs` handles compositor shortcut commands. Tests use injected clicks and local test sockets; they never inject real mouse input.
 
 Built with [Slint](https://slint.dev/) and [Enigo](https://github.com/enigo-rs/enigo). This project declares GPL-3.0-only; review Slint's licensing terms before distributing under other terms.
 

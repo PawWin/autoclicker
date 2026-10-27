@@ -1082,10 +1082,6 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
- "tempfile",
- "wayland-client",
- "wayland-protocols-misc",
- "wayland-protocols-wlr",
  "windows 0.61.3",
  "x11rb",
  "xkbcommon",
@@ -4180,6 +4176,9 @@ dependencies = [
  "global-hotkey",
  "slint",
  "slint-build",
+ "wayland-client",
+ "wayland-protocols-wlr",
+ "wayland-server",
  "winresource",
 ]
 
@@ -4744,19 +4743,7 @@ dependencies = [
  "wayland-backend",
  "wayland-client",
  "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-protocols-misc"
-version = "0.3.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e9567599ef23e09b8dad6e429e5738d4509dfc46b3b21f32841a304d16b29c8"
-dependencies = [
- "bitflags 2.13.2",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols",
- "wayland-scanner",
+ "wayland-server",
 ]
 
 [[package]]
@@ -4783,6 +4770,7 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-scanner",
+ "wayland-server",
 ]
 
 [[package]]
@@ -4794,6 +4782,19 @@ dependencies = [
  "proc-macro2",
  "quick-xml",
  "quote",
+]
+
+[[package]]
+name = "wayland-server"
+version = "0.31.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dde9c29be0f723a573977de51ee455bf3dfa03652730a74f9dd3b337e374d75"
+dependencies = [
+ "bitflags 2.13.2",
+ "downcast-rs",
+ "rustix 1.1.6",
+ "wayland-backend",
+ "wayland-scanner",
 ]
 
 [[package]]

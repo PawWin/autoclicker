@@ -8,8 +8,16 @@ license = "GPL-3.0-only"
 
 [dependencies]
 slint = { version = "=1.18.1", default-features = false, features = ["std", "backend-winit", "renderer-software", "accessibility", "compat-1-18"] }
-enigo = { version = "0.6.1", features = ["wayland"] }
+enigo = "0.6.1"
 global-hotkey = "0.9.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wayland-server = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["server"] }
 
 [build-dependencies]
 slint-build = "=1.18.1"
