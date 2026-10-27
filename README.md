@@ -23,7 +23,7 @@ The executable is `target/release/tap-autoclicker` (`.exe` on Windows). The firs
 
 ## Use
 
-1. Set an interval from 10 to 60,000 milliseconds, or choose a preset.
+1. Set an interval from 1 to 60,000 milliseconds, or choose a preset.
 2. Choose the left, right, or middle mouse button.
 3. Repeat until stopped, or choose **Count** and enter the number of clicks.
 4. Press **Start clicking**, then move your cursor to the target during the three-second countdown.

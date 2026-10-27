@@ -13,8 +13,8 @@ impl Config {
             .trim()
             .parse::<u64>()
             .map_err(|_| "Enter a whole number for the interval.")?;
-        if !(10..=60_000).contains(&ms) {
-            return Err("Choose an interval between 10 and 60,000 ms.".into());
+        if !(1..=60_000).contains(&ms) {
+            return Err("Choose an interval between 1 and 60,000 ms.".into());
         }
         if !(0..=2).contains(&button) || (limited && limit < 1) {
             return Err("Choose a valid mouse button and click count.".into());
@@ -118,11 +118,19 @@ mod tests {
 
     #[test]
     fn rejects_invalid_intervals_and_counts() {
-        for interval in ["", "abc", "-1", "9", "60001", "1.5"] {
+        for interval in ["", "abc", "-1", "0", "60001", "1.5"] {
             assert!(Config::parse(interval, 0, false, 1).is_err());
         }
         assert!(Config::parse("10", 0, true, 0).is_err());
         assert!(Config::parse("60000", 2, true, 1).is_ok());
+    }
+
+    #[test]
+    fn accepts_intervals_below_ten_milliseconds() {
+        for ms in 1..=10 {
+            let config = Config::parse(&ms.to_string(), 0, false, 1).unwrap();
+            assert_eq!(config.interval, Duration::from_millis(ms));
+        }
     }
 
     #[test]
