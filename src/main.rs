@@ -1,17 +1,22 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 #[cfg(target_os = "linux")]
+mod compositor;
+#[cfg(target_os = "linux")]
 mod control;
 mod engine;
 mod input;
+mod shortcuts;
 
 use engine::{Command, Config, Event};
-use global_hotkey::{
-    GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState,
-    hotkey::{Code, HotKey},
-};
+use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
 use slint::ComponentHandle;
-use std::{cell::Cell, rc::Rc, sync::mpsc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    sync::mpsc,
+    time::Duration,
+};
 
 slint::include_modules!();
 
@@ -53,25 +58,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let worker = std::thread::spawn(move || engine::worker(command_rx, events));
     let generation = Rc::new(Cell::new(0u64));
 
-    // X11 shortcuts do not work across native Wayland applications. Don't advertise them.
-    let hotkey = HotKey::new(None, Code::F6);
-    let manager = if wayland {
-        None
-    } else {
-        GlobalHotKeyManager::new()
-            .ok()
-            .filter(|manager| manager.register(hotkey).is_ok())
+    let shortcuts = Rc::new(RefCell::new(shortcuts::Shortcuts::new(wayland)));
+    let active_hotkey = Rc::new(Cell::new(None));
+    let registration = match &mut *shortcuts.borrow_mut() {
+        Ok(shortcuts) => shortcuts.register("F6"),
+        Err(error) => Err(error.clone()),
     };
-    ui.set_hotkey_available(manager.is_some());
-    let default_notice: slint::SharedString = if wayland {
-        "Wayland: bind F6 to tap-autoclicker --toggle in your compositor. Stop also works here."
-            .into()
-    } else if manager.is_none() {
-        "F6 is unavailable. Use the Start / Stop button in this window.".into()
-    } else {
-        "".into()
-    };
-    ui.set_notice(default_notice.clone());
+    match registration {
+        Ok(hotkey) => {
+            active_hotkey.set(Some(hotkey));
+            ui.set_hotkey_available(true);
+            ui.set_hotkey_label("F6".into());
+        }
+        Err(error) => {
+            ui.set_shortcut_prompt(true);
+            ui.set_shortcut_error(error.into());
+        }
+    }
+    let weak = ui.as_weak();
+    let backend = shortcuts.clone();
+    let active = active_hotkey.clone();
+    ui.on_set_shortcut(move |key| {
+        let Some(ui) = weak.upgrade() else { return };
+        let result = {
+            let mut backend = backend.borrow_mut();
+            // Retry detection after a missing compositor tool or session error.
+            if backend.is_err() {
+                *backend = shortcuts::Shortcuts::new(wayland);
+            }
+            match &mut *backend {
+                Ok(shortcuts) => shortcuts.register(&key),
+                Err(error) => Err(error.clone()),
+            }
+        };
+        match result {
+            Ok(hotkey) => {
+                active.set(Some(hotkey));
+                ui.set_hotkey_available(true);
+                ui.set_hotkey_label(key);
+                ui.set_shortcut_prompt(false);
+                ui.set_shortcut_error("".into());
+            }
+            Err(error) => ui.set_shortcut_error(error.into()),
+        }
+    });
 
     let weak = ui.as_weak();
     let tx = commands.clone();
@@ -99,7 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
         current.set(current.get().wrapping_add(1));
-        ui.set_notice(default_notice.clone());
+        ui.set_notice("".into());
         ui.set_clicks("0".into());
         ui.set_countdown(3);
         ui.set_status("Move your cursor to the target".into());
@@ -129,7 +159,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             for event in GlobalHotKeyEvent::receiver().try_iter() {
-                if event.id == hotkey.id() && event.state == HotKeyState::Pressed {
+                if active_hotkey
+                    .get()
+                    .is_some_and(|hotkey| event.id == hotkey.id())
+                    && event.state == HotKeyState::Pressed
+                {
                     ui.invoke_toggle();
                 }
             }
@@ -164,6 +198,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     timer.stop();
     let _ = commands.send(Command::Shutdown);
     let _ = worker.join();
-    drop(manager);
+    // The timer no longer owns any shortcut state when compositor bindings are removed.
+    drop(ui);
+    drop(shortcuts);
     result.map_err(Into::into)
 }

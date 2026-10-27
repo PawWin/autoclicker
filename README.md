@@ -36,33 +36,20 @@ Clicks follow the current cursor position. The counter resets for each session. 
 - **Windows:** native input injection and global F6 shortcut.
 - **macOS:** input injection requires granting Accessibility permission to the app or launching terminal in System Settings. Global shortcuts may also require permission.
 - **Linux / X11:** input through the Rust X11 backend; global F6 shortcut.
-- **Linux / Wayland (niri and Hyprland):** native clicks through `wlr-virtual-pointer`, with compositor keybindings for global start/stop. Requires [niri 25.02 or newer](https://github.com/niri-wm/niri/releases/tag/v25.02), or Hyprland with the virtual pointer protocol enabled. Other compositors exposing the same protocol may also work. Unsupported compositors report an error instead of silently falling back to XWayland. No root access or input helper daemon is required.
+- **Linux / Wayland (niri and Hyprland):** native clicks through `wlr-virtual-pointer`, with automatic compositor shortcuts for global start/stop. Requires [niri 25.02 or newer](https://github.com/niri-wm/niri/releases/tag/v25.02), or Hyprland with the virtual pointer protocol enabled. Other compositors exposing the same protocol may also work. Unsupported compositors report an error instead of silently falling back to XWayland. No root access or input helper daemon is required.
 
 The app reports shortcut availability, invalid settings, and input errors in the window. Release 0.0.1 was built locally: Linux on an isolated Ubuntu 22.04 userspace, and Windows through cargo-xwin targeting MSVC. Both packages were checked for startup on Linux (the Windows executable under Wine). Native Windows interaction has not been verified. macOS builds are not included.
 
 ## niri and Hyprland shortcuts
 
-Open Tap normally, then add compositor keybindings to control the running window from any app. `--toggle` starts a new countdown or stops the current session; `--stop` only stops, including during the countdown. These commands exit immediately and do not open another window. Tap must already be running in the same Wayland session.
+Tap checks for an existing **F6** binding on startup and sets up global start/stop automatically when it is free. If F6 is already taken, the window asks you to choose another function key (F1–F12). Tap checks that key too; it never replaces your existing bindings. You can skip setup and use the in-app Start / Stop button. Escape stops while the app has keyboard focus.
 
-For **niri**, add these entries to the `binds` block in `~/.config/niri/config.kdl`:
+- **Hyprland:** Tap reads the active bindings and registers a temporary shortcut through `hyprctl`. Both legacy Hyprland and the Lua configuration introduced in 0.55 are supported. The shortcut is removed when Tap closes. Reloading your Hyprland config clears temporary shortcuts; restart Tap to register again.
+- **niri:** Tap reads `NIRI_CONFIG`, or `$XDG_CONFIG_HOME/niri/config.kdl` (default `~/.config/niri/config.kdl`), including any `include` files. It adds a marked Tap-only block, validates the updated configuration with `niri validate`, and applies it atomically. niri reloads the config automatically. Tap removes its block when closing and preserves other edits. If you use a custom config path, export `NIRI_CONFIG` to match the running compositor. The active config must be writable; automatic setup does not use `/etc/niri/config.kdl` as a fallback.
 
-```kdl
-binds {
-    F6 repeat=false { spawn "tap-autoclicker" "--toggle"; }
-    F7 repeat=false allow-inhibiting=false { spawn "tap-autoclicker" "--stop"; }
-}
-```
+No manual keybinding entries are needed. Tap uses its executable's absolute path (or the AppImage launcher path), so it need not be on `PATH`. A shortcut left behind by an unclean niri shutdown is replaced on the next startup. A shortcut is chosen afresh on each launch, starting with F6.
 
-For **Hyprland**, add to `~/.config/hypr/hyprland.conf`:
-
-```ini
-bind = , F6, exec, tap-autoclicker --toggle
-bind = , F7, exec, tap-autoclicker --stop
-```
-
-Replace `tap-autoclicker` with the absolute path to your executable if it is not on `PATH`. For an AppImage, use its absolute path in both bindings, for example `/home/you/Applications/Tap-0.0.1-linux-x86_64.AppImage --toggle` (in niri, keep the path and argument as separate quoted strings). Reload your compositor configuration after editing it. Choose other keys if F6/F7 are already bound. The in-app Stop button and focused Escape key remain available.
-
-Tap does not register X11 global shortcuts on Wayland; the compositor owns these bindings. A single Tap window runs per Wayland display, using a control socket under `XDG_RUNTIME_DIR`. Running the command from a different session or without Tap open returns an error.
+`tap-autoclicker --toggle` and `tap-autoclicker --stop` remain available for scripts or custom compositor bindings. They control the running window over a socket under `XDG_RUNTIME_DIR` and exit immediately. Tap must be running in the same Wayland session. Only one Tap window runs per Wayland display.
 
 ## Development
 
@@ -72,7 +59,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-`ui/app.slint` defines the interface. `src/main.rs` connects callbacks, global shortcuts, and UI updates. `src/engine.rs` owns the click worker and interruptible timing. `src/input/wayland.rs` provides the native Wayland pointer backend, and `src/control.rs` handles compositor shortcut commands. Tests use injected clicks and local test sockets; they never inject real mouse input.
+`ui/app.slint` defines the interface. `src/main.rs` connects callbacks, global shortcuts, and UI updates. `src/engine.rs` owns the click worker and interruptible timing. `src/input/wayland.rs` provides the native Wayland pointer backend, and `src/control.rs` handles compositor shortcut commands. `src/shortcuts.rs` and `src/compositor.rs` check and register global shortcuts. Tests use injected clicks and local test sockets; they never inject real mouse input.
 
 Built with [Slint](https://slint.dev/) and [Enigo](https://github.com/enigo-rs/enigo). This project declares GPL-3.0-only; review Slint's licensing terms before distributing under other terms.
 

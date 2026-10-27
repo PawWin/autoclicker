@@ -1,4 +1,4 @@
-import { SpinBox } from "std-widgets.slint";
+import { SpinBox, ComboBox, Button, Palette } from "std-widgets.slint";
 
 component Choice inherits Rectangle {
     in property <string> label;
@@ -28,11 +28,12 @@ component Choice inherits Rectangle {
 
 export component AppWindow inherits Window {
     title: "Tap · Autoclicker";
+    init => { Palette.color-scheme = ColorScheme.light; }
     icon: @image-url("../assets/icon.svg");
     min-width: 420px;
     max-width: 420px;
-    min-height: 650px;
-    max-height: 650px;
+    min-height: root.shortcut-prompt ? 800px : 650px;
+    max-height: root.shortcut-prompt ? 800px : 650px;
     background: #f7f6f2;
     default-font-family: "DejaVu Sans";
     default-font-size: 13px;
@@ -46,6 +47,10 @@ export component AppWindow inherits Window {
     in property <string> status: "Ready when you are";
     in property <string> notice;
     in property <bool> hotkey-available: false;
+    in property <string> hotkey-label;
+    in-out property <bool> shortcut-prompt: false;
+    in property <string> shortcut-error;
+    callback set-shortcut(string);
     callback toggle;
     forward-focus: focus;
 
@@ -137,6 +142,23 @@ export component AppWindow inherits Window {
             if root.limited : SpinBox { width: 104px; minimum: 1; maximum: 1000000; value <=> root.limit; enabled: !root.running; accessible-label: "Number of clicks"; }
         }
         Rectangle { vertical-stretch: 1; min-height: 12px; }
+        if root.shortcut-prompt : VerticalLayout {
+            spacing: 8px;
+            Text { text: "Choose a start / stop key"; color: #252522; font-size: 14px; font-weight: 600; }
+            Text { text: root.shortcut-error; wrap: word-wrap; color: #a4482d; font-size: 11px; }
+            HorizontalLayout {
+                spacing: 8px;
+                shortcut-key := ComboBox {
+                    model: ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
+                    current-index: 6;
+                    accessible-label: "Global start and stop key";
+                }
+                Button { text: "Use key"; clicked => { root.set-shortcut(shortcut-key.current-value); } }
+                Button { text: "Skip"; clicked => { root.shortcut-prompt = false; } }
+            }
+            Text { text: "Tap checks the key before using it. You can also use the button below."; wrap: word-wrap; color: #65655e; font-size: 11px; }
+        }
+
         Text {
             height: 38px; text: root.notice != "" ? root.notice : "Clicks follow your cursor. Start with a 3-second countdown.";
             wrap: word-wrap; color: root.notice != "" ? #a4482d : #83837a; font-size: 11px; vertical-alignment: center;
@@ -150,7 +172,7 @@ export component AppWindow inherits Window {
                 padding-left: 18px; padding-right: 18px;
                 Text { text: root.running ? (root.countdown > 0 ? "Cancel · " + root.countdown : "Stop clicking") : "Start clicking"; color: white; font-size: 14px; font-weight: 600; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
-                if root.hotkey-available : Text { text: "F6"; color: #ffffff; opacity: 0.75; vertical-alignment: center; font-size: 11px; }
+                if root.hotkey-available : Text { text: root.hotkey-label; color: #ffffff; opacity: 0.75; vertical-alignment: center; font-size: 11px; }
             }
             border-width: start-keyboard.has-focus ? 2px : 0px;
             border-color: #a53b20;
